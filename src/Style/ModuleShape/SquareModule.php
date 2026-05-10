@@ -9,8 +9,9 @@ namespace Dunn\QrCode\Style\ModuleShape;
  */
 final class SquareModule implements ModuleShape
 {
-    public function svgPath(int $x, int $y): string
+    public function svgPath(int $x, int $y, ModuleNeighbours $neighbours): string
     {
+        // SquareModule is context-free: $neighbours is ignored.
         return "M{$x} {$y}h1v1h-1z";
     }
 

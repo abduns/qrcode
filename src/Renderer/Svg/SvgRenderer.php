@@ -15,6 +15,7 @@ use Dunn\QrCode\Style\EyeStyle\SquareEyeInner;
 use Dunn\QrCode\Style\EyeStyle\SquareEyeOuter;
 use Dunn\QrCode\Style\Gradient\Gradient;
 use Dunn\QrCode\Style\Logo;
+use Dunn\QrCode\Style\ModuleShape\ModuleNeighbours;
 use Dunn\QrCode\Style\ModuleShape\ModuleShape;
 use Dunn\QrCode\Style\ModuleShape\SquareModule;
 use InvalidArgumentException;
@@ -151,7 +152,17 @@ final class SvgRenderer implements Renderer
                 if (self::isInFinderArea($r, $c, $size)) {
                     continue;
                 }
-                $parts[] = $this->moduleShape->svgPath($c + $this->margin, $r + $this->margin);
+                $neighbours = new ModuleNeighbours(
+                    top: $r > 0 && $matrix->get($r - 1, $c),
+                    right: $c < $size - 1 && $matrix->get($r, $c + 1),
+                    bottom: $r < $size - 1 && $matrix->get($r + 1, $c),
+                    left: $c > 0 && $matrix->get($r, $c - 1),
+                );
+                $parts[] = $this->moduleShape->svgPath(
+                    $c + $this->margin,
+                    $r + $this->margin,
+                    $neighbours,
+                );
             }
         }
 

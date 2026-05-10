@@ -10,8 +10,9 @@ namespace Dunn\QrCode\Style\ModuleShape;
  */
 final class DotModule implements ModuleShape
 {
-    public function svgPath(int $x, int $y): string
+    public function svgPath(int $x, int $y, ModuleNeighbours $neighbours): string
     {
+        // DotModule is context-free: $neighbours is ignored.
         // Start at top of the circle (x + 0.5, y), arc 180° down to (x + 0.5, y + 1),
         // then arc 180° back up to the start.
         $cx = $x + 0.5;
