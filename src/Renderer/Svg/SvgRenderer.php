@@ -13,6 +13,7 @@ use Dunn\QrCode\Style\EyeStyle\EyeInner;
 use Dunn\QrCode\Style\EyeStyle\EyeOuter;
 use Dunn\QrCode\Style\EyeStyle\SquareEyeInner;
 use Dunn\QrCode\Style\EyeStyle\SquareEyeOuter;
+use Dunn\QrCode\Style\Gradient\Gradient;
 use Dunn\QrCode\Style\Logo;
 use Dunn\QrCode\Style\ModuleShape\ModuleShape;
 use Dunn\QrCode\Style\ModuleShape\SquareModule;
@@ -23,23 +24,15 @@ use InvalidArgumentException;
  *
  * The output is three independently-styled paths (data dots, marker outer
  * ring, marker inner pupil) plus an optional logo `<image>` embed. Each
- * region can have its own colour; when no per-region colour is set, the
- * {@see $foreground} colour is used.
+ * region can have its own colour (Color/hex string) **or** Gradient.
+ *
+ * When no per-region paint is supplied, the {@see $foreground} paint is used.
  *
  * Logo overlays are validated against the QR's ECC level at render time —
  * a logo too large for the chosen ECC throws {@see InvalidConfigurationException}.
  */
 final class SvgRenderer implements Renderer
 {
-    /**
-     * Maximum safe linear ratio for a center logo per ECC level. Derived
-     * from sqrt(recoverable_percentage / 100):
-     *
-     *   L ~7%   → 0.26
-     *   M ~15%  → 0.38
-     *   Q ~25%  → 0.50
-     *   H ~30%  → 0.54
-     */
     private const MAX_LOGO_RATIO = [
         'L' => 0.26,
         'M' => 0.38,
@@ -47,26 +40,26 @@ final class SvgRenderer implements Renderer
         'H' => 0.54,
     ];
 
-    private readonly Color $foreground;
-    private readonly Color $background;
+    private readonly Color|Gradient $foreground;
+    private readonly Color|Gradient $background;
     private readonly ModuleShape $moduleShape;
     private readonly EyeOuter $eyeOuter;
     private readonly EyeInner $eyeInner;
-    private readonly ?Color $dotColor;
-    private readonly ?Color $markerOuterColor;
-    private readonly ?Color $markerInnerColor;
+    private readonly Color|Gradient|null $dotColor;
+    private readonly Color|Gradient|null $markerOuterColor;
+    private readonly Color|Gradient|null $markerInnerColor;
 
     public function __construct(
         private readonly int $size = 300,
         private readonly int $margin = 4,
-        Color|string $foreground = '#000000',
-        Color|string $background = '#ffffff',
+        Color|Gradient|string $foreground = '#000000',
+        Color|Gradient|string $background = '#ffffff',
         ?ModuleShape $moduleShape = null,
         ?EyeOuter $eyeOuter = null,
         ?EyeInner $eyeInner = null,
-        Color|string|null $dotColor = null,
-        Color|string|null $markerOuterColor = null,
-        Color|string|null $markerInnerColor = null,
+        Color|Gradient|string|null $dotColor = null,
+        Color|Gradient|string|null $markerOuterColor = null,
+        Color|Gradient|string|null $markerInnerColor = null,
         private readonly ?Logo $logo = null,
     ) {
         if ($size <= 0) {
@@ -76,14 +69,14 @@ final class SvgRenderer implements Renderer
             throw new InvalidArgumentException("margin must be >= 0, got {$margin}");
         }
 
-        $this->foreground = self::asColor($foreground);
-        $this->background = self::asColor($background);
+        $this->foreground = self::asPaint($foreground);
+        $this->background = self::asPaint($background);
         $this->moduleShape = $moduleShape ?? new SquareModule();
         $this->eyeOuter = $eyeOuter ?? new SquareEyeOuter();
         $this->eyeInner = $eyeInner ?? new SquareEyeInner();
-        $this->dotColor = $dotColor !== null ? self::asColor($dotColor) : null;
-        $this->markerOuterColor = $markerOuterColor !== null ? self::asColor($markerOuterColor) : null;
-        $this->markerInnerColor = $markerInnerColor !== null ? self::asColor($markerInnerColor) : null;
+        $this->dotColor = $dotColor !== null ? self::asPaint($dotColor) : null;
+        $this->markerOuterColor = $markerOuterColor !== null ? self::asPaint($markerOuterColor) : null;
+        $this->markerInnerColor = $markerInnerColor !== null ? self::asPaint($markerInnerColor) : null;
     }
 
     public function render(QrCode $qr): string
@@ -98,16 +91,24 @@ final class SvgRenderer implements Renderer
         $outerPath = $this->buildOuterPath($qr);
         $innerPath = $this->buildInnerPath($qr);
 
-        $dotFill = ($this->dotColor ?? $this->foreground)->toCss();
-        $outerFill = ($this->markerOuterColor ?? $this->foreground)->toCss();
-        $innerFill = ($this->markerInnerColor ?? $this->foreground)->toCss();
-        $bgFill = $this->background->toCss();
+        // Unique prefix so multiple SVGs on the same page don't collide on
+        // gradient ids.
+        $idPrefix = 'qr-'.bin2hex(random_bytes(3));
+
+        $bg = $this->resolvePaint($this->background, $this->background, $idPrefix.'-bg');
+        $dot = $this->resolvePaint($this->dotColor, $this->foreground, $idPrefix.'-dot');
+        $outer = $this->resolvePaint($this->markerOuterColor, $this->foreground, $idPrefix.'-outer');
+        $inner = $this->resolvePaint($this->markerInnerColor, $this->foreground, $idPrefix.'-inner');
+
+        $defs = $bg['defs'].$dot['defs'].$outer['defs'].$inner['defs'];
+        $defsBlock = $defs !== '' ? "<defs>{$defs}</defs>" : '';
 
         $rendering = $this->chooseShapeRendering();
-        $logoEl = $this->buildLogoElement($modules);
+        $logoEl = $this->buildLogoElement($modules, $bg['fill']);
 
         return sprintf(
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" width="%d" height="%d" shape-rendering="%s">'
+            .'%s'
             .'<rect width="100%%" height="100%%" fill="%s"/>'
             .'<path d="%s" fill="%s" fill-rule="evenodd"/>'
             .'<path d="%s" fill="%s" fill-rule="evenodd"/>'
@@ -119,13 +120,14 @@ final class SvgRenderer implements Renderer
             $this->size,
             $this->size,
             htmlspecialchars($rendering, ENT_QUOTES | ENT_XML1),
-            htmlspecialchars($bgFill, ENT_QUOTES | ENT_XML1),
+            $defsBlock,
+            htmlspecialchars($bg['fill'], ENT_QUOTES | ENT_XML1),
             $dotPath,
-            htmlspecialchars($dotFill, ENT_QUOTES | ENT_XML1),
+            htmlspecialchars($dot['fill'], ENT_QUOTES | ENT_XML1),
             $outerPath,
-            htmlspecialchars($outerFill, ENT_QUOTES | ENT_XML1),
+            htmlspecialchars($outer['fill'], ENT_QUOTES | ENT_XML1),
             $innerPath,
-            htmlspecialchars($innerFill, ENT_QUOTES | ENT_XML1),
+            htmlspecialchars($inner['fill'], ENT_QUOTES | ENT_XML1),
             $logoEl,
         );
     }
@@ -160,9 +162,9 @@ final class SvgRenderer implements Renderer
     {
         $size = $qr->matrix->size();
         $corners = [
-            [$this->margin, $this->margin],                                 // top-left
-            [$size - 7 + $this->margin, $this->margin],                     // top-right
-            [$this->margin, $size - 7 + $this->margin],                     // bottom-left
+            [$this->margin, $this->margin],
+            [$size - 7 + $this->margin, $this->margin],
+            [$this->margin, $size - 7 + $this->margin],
         ];
 
         return implode('', array_map(
@@ -214,7 +216,7 @@ final class SvgRenderer implements Renderer
         }
     }
 
-    private function buildLogoElement(int $modules): string
+    private function buildLogoElement(int $modules, string $bgFill): string
     {
         if ($this->logo === null) {
             return '';
@@ -222,12 +224,9 @@ final class SvgRenderer implements Renderer
 
         $logoSize = $modules * $this->logo->sizeRatio;
         $offset = $this->margin + ($modules - $logoSize) / 2;
-        $bgFill = $this->background->toCss();
 
         $parts = [];
         if ($this->logo->clearBackground) {
-            // Small inset rect of the background colour so the logo doesn't
-            // collide visually with adjacent QR dots.
             $pad = max(0.5, $logoSize * 0.04);
             $parts[] = sprintf(
                 '<rect x="%s" y="%s" width="%s" height="%s" fill="%s"/>',
@@ -250,9 +249,37 @@ final class SvgRenderer implements Renderer
         return implode('', $parts);
     }
 
-    private static function asColor(Color|string $value): Color
+    /**
+     * Resolve a paint to a (fill, defs) pair. Gradients produce a `<defs>`
+     * fragment and a `url(#…)` reference; Colors produce a hex/css fill and
+     * empty defs.
+     *
+     * @return array{fill: string, defs: string}
+     */
+    private function resolvePaint(
+        Color|Gradient|null $paint,
+        Color|Gradient $fallback,
+        string $id,
+    ): array {
+        $resolved = $paint ?? $fallback;
+
+        if ($resolved instanceof Color) {
+            return ['fill' => $resolved->toCss(), 'defs' => ''];
+        }
+
+        return [
+            'fill' => 'url(#'.$id.')',
+            'defs' => $resolved->defsFragment($id),
+        ];
+    }
+
+    private static function asPaint(Color|Gradient|string $value): Color|Gradient
     {
-        return $value instanceof Color ? $value : Color::hex($value);
+        if ($value instanceof Color || $value instanceof Gradient) {
+            return $value;
+        }
+
+        return Color::hex($value);
     }
 
     private static function isInFinderArea(int $r, int $c, int $size): bool
