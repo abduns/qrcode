@@ -48,10 +48,15 @@ interface Renderer
 }
 ```
 
-- **`SvgRenderer`** (zero deps) — emits a single `<svg>` element. Configurable
-  size, margin, foreground, background. Typical output: <5 KB.
-- **`GdPngRenderer`** (requires `ext-gd`) — pixel-perfect raster with integer
-  module sizing for crisp edges.
+- **`SvgRenderer`** (zero deps) — emits an `<svg>` element with three
+  independent paths (data dots, marker outer ring, marker inner pupil) plus
+  an optional `<image>` logo. Supports per-region colours, gradients
+  (`LinearGradient`, `RadialGradient`), and the full shape catalogue.
+  Typical output: <5 KB without gradients/logo.
+- **`GdPngRenderer`** (requires `ext-gd`) — pixel-perfect raster with the
+  same customisation surface as the SVG renderer except gradients (which
+  fall back to flat colours). Logos are decoded via `imagecreatefromstring`
+  so PNG/JPEG/GIF logos work; SVG logos require the SVG renderer.
 - **`ConsoleRenderer`** — Unicode block characters; useful for debugging.
 
 ```php
@@ -100,19 +105,39 @@ $renderer = new SvgRenderer(
 
 **Available shapes:**
 
-| Region | Default | Alternative |
+| Region | Default | Alternatives |
 |---|---|---|
-| `moduleShape` (data) | `SquareModule` | `DotModule` |
+| `moduleShape` (data) | `SquareModule` | `DotModule`, `RoundedModule` |
 | `eyeOuter` (marker border) | `SquareEyeOuter` | `CircleEyeOuter` |
 | `eyeInner` (marker center) | `SquareEyeInner` | `CircleEyeInner` |
 
 Mix and match — e.g. `CircleEyeOuter` + `SquareEyeInner` gives a round border
-around a square pupil.
+around a square pupil. `RoundedModule` is **neighbour-aware**: corners are
+rounded only when both adjacent neighbours are absent, so adjacent modules
+merge into pills, L-shapes, and larger blobs as the data dictates.
 
-**Colours:** every colour parameter accepts a `Color` instance or a hex
-string. `Color` provides `Color::hex()`, `Color::rgb()`, `Color::rgba()`,
-plus `Color::black()` / `Color::white()`. Unspecified per-region colours
-fall back to the `foreground`.
+**Colours and gradients:** every paint parameter accepts a `Color`, a
+`Gradient`, or a hex string. Unspecified per-region paints fall back to the
+`foreground` paint.
+
+```php
+use Dunn\QrCode\Style\Gradient\{LinearGradient, RadialGradient, GradientStop};
+
+new SvgRenderer(
+    dotColor: new LinearGradient([
+        new GradientStop(0.0, Color::hex('#264653')),
+        new GradientStop(1.0, Color::hex('#2a9d8f')),
+    ]),
+    markerInnerColor: new RadialGradient([
+        new GradientStop(0.0, Color::hex('#f4a261')),
+        new GradientStop(1.0, Color::hex('#e76f51')),
+    ]),
+);
+```
+
+`Color` provides `Color::hex()`, `Color::rgb()`, `Color::rgba()`, plus named
+factories `Color::black()` / `Color::white()`. Gradients with RGBA stops emit
+`stop-opacity` so semi-transparent gradients work.
 
 **Logo:** `Logo` accepts raw bytes + MIME or loads from a file via
 `Logo::fromFile($path, sizeRatio)`. Supports SVG, PNG, JPEG, GIF. The
@@ -140,9 +165,9 @@ QrCode::create($data)
 Defaults: `EccLevel::Medium`, auto-version (smallest that fits), auto-mode
 (smallest single mode that fits).
 
-Out of v0.2.x scope (planned for v0.3 / v1.x): Kanji mode, Micro QR (M1–M4),
-ECI, optimal mixed-mode segmentation, Structured Append, gradients,
-neighbour-aware rounded shapes, per-region colours in the PNG renderer.
+Out of v0.3.x scope (planned for v1.x): Kanji mode, Micro QR (M1–M4),
+ECI, optimal mixed-mode segmentation, Structured Append, gradients in the
+PNG renderer.
 
 ## Spec correctness
 

@@ -5,6 +5,54 @@ based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 once it reaches 1.0.0. Pre-1.0 minor bumps may carry breaking changes.
 
+## [0.3.0] — 2026-05-11
+
+### Added
+- `Style\ModuleShape\RoundedModule` — neighbour-aware rounded module. Corners
+  are rounded only when both adjacent neighbours are absent, so adjacent
+  modules merge into pills, L-shapes, and larger blobs. With `r = 0.5`,
+  isolated modules render as full circles.
+- `Style\ModuleShape\ModuleNeighbours` readonly value object (top/right/
+  bottom/left + an `isolated()` factory) passed to every `ModuleShape`.
+- `Style\Gradient\Gradient` interface with `LinearGradient` + `RadialGradient`
+  implementations and a `GradientStop` value object (offset 0..1 + `Color`,
+  with `stop-opacity` emitted for RGBA stops).
+- `SvgRenderer` accepts `Color|Gradient|string` for every paint parameter
+  (`foreground`, `background`, `dotColor`, `markerOuterColor`,
+  `markerInnerColor`). Gradients produce a `<defs>` block with unique
+  per-render ids (`qr-{6-hex}-{region}`) and `fill="url(#…)"` references.
+- `GdPngRenderer` now mirrors `SvgRenderer`'s customisation surface:
+  `Color|string` everywhere, `dotColor`/`markerOuterColor`/`markerInnerColor`,
+  `?ModuleShape`/`?EyeOuter`/`?EyeInner`/`?Logo` constructor args. Raster
+  logos are composited via `imagecreatefromstring` + `imagecopyresampled`.
+  Eye shapes use `imagefilledellipse` for circles and filled rects for
+  squares.
+
+### Changed
+- `ModuleShape::svgPath()` signature is now
+  `svgPath(int $x, int $y, ModuleNeighbours $neighbours): string`.
+  `SquareModule` and `DotModule` continue to ignore neighbours — output is
+  byte-identical to v0.2.
+
+### Removed (BREAKING)
+- The pre-v0.3 `ModuleShape::svgPath(int, int)` two-arg signature.
+
+### Migration
+
+Custom `ModuleShape` implementations need to widen the signature:
+
+```php
+// v0.2.0
+public function svgPath(int $x, int $y): string { /* … */ }
+
+// v0.3.0
+public function svgPath(int $x, int $y, ModuleNeighbours $neighbours): string { /* … */ }
+```
+
+If your shape is context-free (square, dot, fixed glyph), ignore the new
+parameter. Neighbour-aware shapes consult it to decide which corners to
+round or edges to cut.
+
 ## [0.2.0] — 2026-05-11
 
 ### Added
