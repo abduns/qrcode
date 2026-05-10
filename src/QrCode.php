@@ -4,27 +4,38 @@ declare(strict_types=1);
 
 namespace Dunn\QrCode;
 
+use Dunn\QrCode\Encoder\Mode;
+use Dunn\QrCode\Mask\MaskPattern;
+use Dunn\QrCode\Matrix\Matrix;
+
 /**
- * Public entry point for the QR Code library.
+ * Immutable result of the QR Code generation pipeline. Holds the masked
+ * matrix and the metadata renderers need.
  *
- * The full fluent builder + immutable value-object API lands in Phase 5 of
- * the development plan. This skeleton exists so the package is installable
- * and CI is green from commit one.
+ * Use {@see QrCode::create()} to start building one:
+ *
+ *     $qr = QrCode::create('https://example.com')
+ *         ->errorCorrection(EccLevel::Quartile)
+ *         ->build();
  */
-final class QrCode
+final readonly class QrCode
 {
-    private function __construct(
-        private readonly string $data,
+    public function __construct(
+        public Matrix $matrix,
+        public int $version,
+        public EccLevel $eccLevel,
+        public Mode $mode,
+        public MaskPattern $maskPattern,
     ) {
     }
 
-    public static function create(string $data): self
+    public static function create(string $data): Builder
     {
-        return new self($data);
+        return new Builder($data);
     }
 
-    public function getData(): string
+    public function size(): int
     {
-        return $this->data;
+        return $this->matrix->size();
     }
 }
