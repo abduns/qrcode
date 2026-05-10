@@ -64,31 +64,68 @@ echo (new ConsoleRenderer(margin: 2))->render($qr);
 
 ## Customization
 
-Swap in alternative module shapes and finder-pattern (eye) styles via the SVG
-renderer:
+The SVG renderer paints three regions independently — **data dots**, **marker
+outer ring**, **marker inner pupil** — plus an optional center logo. Each
+region can have its own shape and colour:
 
 ```php
 use Dunn\QrCode\Renderer\Svg\SvgRenderer;
 use Dunn\QrCode\Style\Color;
+use Dunn\QrCode\Style\Logo;
 use Dunn\QrCode\Style\ModuleShape\DotModule;
-use Dunn\QrCode\Style\EyeStyle\CircleEye;
+use Dunn\QrCode\Style\EyeStyle\CircleEyeOuter;
+use Dunn\QrCode\Style\EyeStyle\SquareEyeInner;
 
 $renderer = new SvgRenderer(
-    size: 300,
+    size: 360,
     margin: 4,
-    foreground: Color::hex('#1a1a2e')->toCss(),
-    background: Color::hex('#fafafa')->toCss(),
+    background: Color::hex('#fafafa'),
+
+    // Data dots: round, dark navy.
     moduleShape: new DotModule(),
-    eyeStyle: new CircleEye(),
+    dotColor: Color::hex('#264653'),
+
+    // Marker outer ring: round, teal.
+    eyeOuter: new CircleEyeOuter(),
+    markerOuterColor: Color::hex('#2a9d8f'),
+
+    // Marker inner pupil: square, terracotta.
+    eyeInner: new SquareEyeInner(),
+    markerInnerColor: Color::hex('#e76f51'),
+
+    // Optional center logo (validated against the QR's ECC level).
+    logo: Logo::fromFile(__DIR__ . '/logo.png', sizeRatio: 0.18),
 );
 ```
 
-Available shapes:
-- `Style\ModuleShape\SquareModule` (default), `DotModule`
-- `Style\EyeStyle\SquareEye` (default), `CircleEye`
+**Available shapes:**
 
-`Color` is an immutable RGBA value object with `Color::hex()`, `Color::rgb()`,
-`Color::rgba()`, and named factories `Color::black()` / `Color::white()`.
+| Region | Default | Alternative |
+|---|---|---|
+| `moduleShape` (data) | `SquareModule` | `DotModule` |
+| `eyeOuter` (marker border) | `SquareEyeOuter` | `CircleEyeOuter` |
+| `eyeInner` (marker center) | `SquareEyeInner` | `CircleEyeInner` |
+
+Mix and match — e.g. `CircleEyeOuter` + `SquareEyeInner` gives a round border
+around a square pupil.
+
+**Colours:** every colour parameter accepts a `Color` instance or a hex
+string. `Color` provides `Color::hex()`, `Color::rgb()`, `Color::rgba()`,
+plus `Color::black()` / `Color::white()`. Unspecified per-region colours
+fall back to the `foreground`.
+
+**Logo:** `Logo` accepts raw bytes + MIME or loads from a file via
+`Logo::fromFile($path, sizeRatio)`. Supports SVG, PNG, JPEG, GIF. The
+renderer validates the logo size against the QR's error-correction level
+and throws `InvalidConfigurationException` if oversized. Safe maximum
+linear ratios:
+
+| ECC | Max ratio | Recommended ratio |
+|---|---|---|
+| Low | 0.26 | ≤ 0.15 |
+| Medium | 0.38 | ≤ 0.20 |
+| Quartile | 0.50 | ≤ 0.25 |
+| High | 0.54 | ≤ 0.30 |
 
 ## Builder options
 
@@ -103,9 +140,9 @@ QrCode::create($data)
 Defaults: `EccLevel::Medium`, auto-version (smallest that fits), auto-mode
 (smallest single mode that fits).
 
-Out of v0.1.0 scope (planned for v1.x): Kanji mode, Micro QR (M1–M4), ECI,
-optimal mixed-mode segmentation, Structured Append, gradients, logo overlay,
-neighbour-aware rounded shapes.
+Out of v0.2.x scope (planned for v0.3 / v1.x): Kanji mode, Micro QR (M1–M4),
+ECI, optimal mixed-mode segmentation, Structured Append, gradients,
+neighbour-aware rounded shapes, per-region colours in the PNG renderer.
 
 ## Spec correctness
 
