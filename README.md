@@ -17,6 +17,22 @@ composer require abduns/qrcode
 
 PHP 8.2+. Zero runtime dependencies. `ext-gd` is needed only for PNG output.
 
+## API stability
+
+`abduns/qrcode` follows [Semantic Versioning](https://semver.org/) from v1.0
+onwards. The following surface is committed — v1.x will only break on a
+major (v2.0) bump:
+
+- `Dunn\QrCode\QrCode`, `Builder`, `EccLevel`
+- `Dunn\QrCode\Encoder\Mode`
+- `Dunn\QrCode\Renderer\*` (interfaces + bundled implementations)
+- `Dunn\QrCode\Style\*` (Color, Logo, all ModuleShape / EyeStyle / Gradient interfaces and bundled implementations)
+- `Dunn\QrCode\Exception\*`
+
+Internal classes (`Math\*`, `ErrorCorrection\*`, `Matrix\*`, `Mask\*`,
+`Tables\*`, and `Encoder\*` excluding `Mode`) may change between minor
+versions and are not part of the SemVer contract.
+
 ## Hello world
 
 ```php
@@ -108,8 +124,8 @@ $renderer = new SvgRenderer(
 | Region | Default | Alternatives |
 |---|---|---|
 | `moduleShape` (data) | `SquareModule` | `DotModule`, `RoundedModule` |
-| `eyeOuter` (marker border) | `SquareEyeOuter` | `CircleEyeOuter` |
-| `eyeInner` (marker center) | `SquareEyeInner` | `CircleEyeInner` |
+| `eyeOuter` (marker border) | `SquareEyeOuter` | `CircleEyeOuter`, `RoundedEyeOuter` |
+| `eyeInner` (marker center) | `SquareEyeInner` | `CircleEyeInner`, `RoundedEyeInner` |
 
 Mix and match — e.g. `CircleEyeOuter` + `SquareEyeInner` gives a round border
 around a square pupil. `RoundedModule` is **neighbour-aware**: corners are
@@ -152,6 +168,61 @@ linear ratios:
 | Quartile | 0.50 | ≤ 0.25 |
 | High | 0.54 | ≤ 0.30 |
 
+## Examples
+
+Four copy-pasteable presets covering the customization surface. All share
+the same QrCode build:
+
+```php
+$qr = QrCode::create($data)->errorCorrection(EccLevel::Quartile)->build();
+```
+
+**Classic** — plain black-and-white square modules with square markers:
+
+```php
+$svg = (new SvgRenderer())->render($qr);
+```
+
+**Dotted** — round modules, round markers, single brand colour:
+
+```php
+$svg = (new SvgRenderer(
+    moduleShape: new DotModule(),
+    eyeOuter: new CircleEyeOuter(),
+    eyeInner: new CircleEyeInner(),
+    foreground: Color::hex('#264653'),
+))->render($qr);
+```
+
+**Rounded with gradient** — neighbour-aware rounded modules, rounded
+markers, linear-gradient dots:
+
+```php
+$svg = (new SvgRenderer(
+    moduleShape: new RoundedModule(),
+    eyeOuter: new RoundedEyeOuter(),
+    eyeInner: new RoundedEyeInner(),
+    dotColor: new LinearGradient([
+        new GradientStop(0.0, Color::hex('#264653')),
+        new GradientStop(1.0, Color::hex('#2a9d8f')),
+    ]),
+))->render($qr);
+```
+
+**Branded** — per-region colours plus a centre logo:
+
+```php
+$svg = (new SvgRenderer(
+    moduleShape: new DotModule(),
+    eyeOuter: new CircleEyeOuter(),
+    eyeInner: new SquareEyeInner(),
+    dotColor: Color::hex('#264653'),
+    markerOuterColor: Color::hex('#2a9d8f'),
+    markerInnerColor: Color::hex('#e76f51'),
+    logo: Logo::fromFile(__DIR__ . '/logo.png', sizeRatio: 0.18),
+))->render($qr);
+```
+
 ## Builder options
 
 ```php
@@ -165,9 +236,7 @@ QrCode::create($data)
 Defaults: `EccLevel::Medium`, auto-version (smallest that fits), auto-mode
 (smallest single mode that fits).
 
-Out of v0.3.x scope (planned for v1.x): Kanji mode, Micro QR (M1–M4),
-ECI, optimal mixed-mode segmentation, Structured Append, gradients in the
-PNG renderer.
+Out of v1.0.x scope (tracked for v1.x or later): Kanji mode, Micro QR (M1–M4), ECI, optimal mixed-mode segmentation, Structured Append, gradients in the PNG renderer.
 
 ## Spec correctness
 

@@ -5,6 +5,32 @@ based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 once it reaches 1.0.0. Pre-1.0 minor bumps may carry breaking changes.
 
+## [1.0.0] — 2026-05-11
+
+First stable release. The public surface listed in the README's "API
+stability" section is now semver-protected — v1.x will only break on a
+major bump.
+
+### Added
+- `Style\EyeStyle\RoundedEyeOuter` + `Style\EyeStyle\RoundedEyeInner` —
+  rounded-square outer ring and rounded inner pupil that complement
+  `RoundedModule`.
+- `## Examples` section in the README with four copy-pasteable presets:
+  classic, dotted, rounded-with-gradient, branded-with-logo.
+- `MIGRATION.md` covering v0.1→v0.2 (`EyeStyle` split), v0.2→v0.3
+  (`ModuleShape::svgPath` neighbours param), and v0.3→v1.0 (no-op).
+- `## API stability` section in the README committing the public surface.
+
+### Notes
+- `GdPngRenderer` does not draw the rounded-square outline natively; it
+  falls back to the SquareEye* renderer for `RoundedEyeOuter` /
+  `RoundedEyeInner` (filled rect + hole). Use `SvgRenderer` for the
+  rounded-eye visual.
+
+### Migration
+No code changes required vs v0.3.0. See `MIGRATION.md` for the full
+v0.1 → v1.0 history if you're upgrading from older versions.
+
 ## [0.3.0] — 2026-05-11
 
 ### Added
