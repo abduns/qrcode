@@ -23,13 +23,15 @@ For Laravel apps, see the bridge package
 - **Rich styling** — three module shapes (`Square`, `Dot`, neighbour-aware `Rounded`) and three eye styles (`Square`, `Circle`, `Rounded`), mixable per region.
 - **Gradients** — `LinearGradient` and `RadialGradient` with multi-stop RGBA on any paint region (SVG only).
 - **Logo embedding** — drop SVG / PNG / JPEG / GIF logos into the centre, with size validated against the QR's error-correction budget.
+- **Typed payload helpers** — first-class builders for URL, text, vCard, WiFi, mailto, SMS, tel, geo and iCalendar events; no need to hand-format wire strings.
 - **Stable, SemVer-backed API** — v1.x commits the public surface; internals are free to evolve.
-- **Quality bar** — PHPStan level 8, 237 Pest tests, 71k assertions, strict-types throughout.
+- **Quality bar** — PHPStan level 8, 295 Pest tests, 71k assertions, strict-types throughout.
 
 ## Table of contents
 
 - [Install](#install)
 - [Quick start](#quick-start)
+- [Payload helpers](#payload-helpers)
 - [Renderers](#renderers)
 - [Styling](#styling)
 - [Examples gallery](#examples-gallery)
@@ -70,6 +72,75 @@ file_put_contents('qr.svg', $svg);
 The builder is immutable — each setter returns a new instance. The result is a
 read-only `QrCode` value object exposing `matrix`, `version`, `eccLevel`,
 `mode`, and `maskPattern`.
+
+## Payload helpers
+
+The encoder is data-agnostic, but most QR codes carry one of a handful of
+well-known formats (URL, vCard, WiFi join, mailto, …). `Dunn\QrCode\Payload`
+ships immutable value objects for each and `QrCode` exposes a matching static
+factory that returns a configured `Builder`. The wire format is built for you
+according to the relevant RFC / convention, with proper escaping.
+
+| Type                | Factory                                            | Wire format             |
+|---------------------|----------------------------------------------------|-------------------------|
+| URL / Link          | `QrCode::url($url)`                                | passes the URL through  |
+| Plain text          | `QrCode::text($text)`                              | passes the text through |
+| Phone (`tel:`)      | `QrCode::phone($number)`                           | RFC 3966                |
+| SMS                 | `QrCode::sms($number, body: ...)`                  | `SMSTO:` (or `sms:` URI)|
+| Email (`mailto:`)   | `QrCode::email($to, subject:, body:, cc:, bcc:)`   | RFC 6068                |
+| Geo                 | `QrCode::geo($lat, $lng, label: ...)`              | RFC 5870                |
+| WiFi                | `QrCode::wifi($ssid, $pwd, $auth, $hidden)`        | Wi-Fi Alliance `WIFI:`  |
+| vCard               | `QrCode::vCard($card)`                             | RFC 2426 (vCard 3.0)    |
+| Calendar event      | `QrCode::event($event)`                            | RFC 5545 (VEVENT)       |
+
+Each factory returns the same `Builder` you get from `QrCode::create()`, so
+the rest of the pipeline (error correction, mode forcing, rendering) is
+unchanged:
+
+```php
+use Dunn\QrCode\QrCode;
+use Dunn\QrCode\EccLevel;
+use Dunn\QrCode\Payload\VCard;
+use Dunn\QrCode\Payload\Event;
+use Dunn\QrCode\Payload\WifiAuth;
+
+// Link / text / phone / sms / email / geo — one-liners
+QrCode::url('https://example.com')->build();
+QrCode::text('hello')->build();
+QrCode::phone('+14155550123')->build();
+QrCode::sms('+14155550123', body: 'hi')->build();
+QrCode::email('a@b.com', subject: 'hello', body: 'hi')->build();
+QrCode::geo(37.7749, -122.4194, label: 'SF')->build();
+
+// WiFi join (defaults to WPA)
+QrCode::wifi('MyNet', password: 'secret', auth: WifiAuth::WPA)
+    ->errorCorrection(EccLevel::Quartile)
+    ->build();
+
+// vCard — fluent value object, then hand to QrCode::vCard()
+$card = VCard::make('John Doe')
+    ->withOrg('Acme')
+    ->withTitle('Engineer')
+    ->addPhone('+14155550123', VCard::TYPE_WORK)
+    ->addEmail('john@acme.com')
+    ->withUrl('https://acme.com');
+
+QrCode::vCard($card)->build();
+
+// Calendar event (iCalendar 2.0 VEVENT)
+$event = Event::make('Launch party')
+    ->from(new DateTimeImmutable('2026-06-01 18:00', new DateTimeZone('UTC')))
+    ->to(new DateTimeImmutable('2026-06-01 22:00', new DateTimeZone('UTC')))
+    ->at('HQ')
+    ->withDescription('See you there');
+
+QrCode::event($event)->build();
+```
+
+All payload value objects implement `\Stringable`, so you can also hand them
+to `QrCode::create()` directly: `QrCode::create($card)->build()` works
+identically to `QrCode::vCard($card)`. Invalid inputs (empty SSID, latitude
+out of range, end-before-start event, …) throw `Dunn\QrCode\Exception\PayloadException`.
 
 ## Renderers
 

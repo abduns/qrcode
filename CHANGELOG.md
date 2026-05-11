@@ -5,6 +5,41 @@ based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 once it reaches 1.0.0. Pre-1.0 minor bumps may carry breaking changes.
 
+## [1.1.0] — 2026-05-11
+
+Additive release — no breaking changes. Adds first-class semantic payload
+builders so callers no longer need to hand-format `WIFI:`, vCard, `mailto:`,
+`geo:`, etc. wire strings.
+
+### Added
+- `Dunn\QrCode\Payload\Url` — URL / link payload.
+- `Dunn\QrCode\Payload\Text` — plain-text payload (pass-through, included for
+  API symmetry).
+- `Dunn\QrCode\Payload\Phone` — `tel:` URI per RFC 3966; normalises
+  formatting characters and validates the result.
+- `Dunn\QrCode\Payload\Sms` — `SMSTO:<number>:<body>` (default, best scanner
+  compatibility) or `sms:<number>?body=...` via `useSmsUri: true`.
+- `Dunn\QrCode\Payload\Email` — `mailto:` URI per RFC 6068 with
+  `subject` / `body` / `cc` / `bcc` support.
+- `Dunn\QrCode\Payload\Geo` — `geo:` URI per RFC 5870 with optional `?q=`
+  label and `[-90, 90]` / `[-180, 180]` validation.
+- `Dunn\QrCode\Payload\Wifi` + `Dunn\QrCode\Payload\WifiAuth` — Wi-Fi Alliance
+  `WIFI:` payload with proper escaping of `\ ; , : "` in SSID / password.
+- `Dunn\QrCode\Payload\VCard` — vCard 3.0 (RFC 2426) with fluent `with* /
+  add*` builders and RFC 6350 §3.4 escaping.
+- `Dunn\QrCode\Payload\Event` — iCalendar 2.0 VEVENT (RFC 5545); auto-generates
+  `UID` and `DTSTAMP`, serialises timestamps in UTC.
+- `Dunn\QrCode\Exception\PayloadException` — single exception type for
+  payload validation failures, extends `QrCodeException`.
+- `QrCode::create()` now accepts `string|\Stringable`, so any payload value
+  object can be handed to it directly.
+- Nine static factories on `QrCode`: `url`, `text`, `phone`, `sms`, `email`,
+  `geo`, `wifi`, `vCard`, `event` — each returns the existing `Builder`.
+
+### Notes
+- Backward-compatible: `QrCode::create(string)` keeps its existing behaviour.
+- 60 new tests, all under `tests/Unit/Payload/`. Total: 295 tests.
+
 ## [1.0.0] — 2026-05-11
 
 First stable release. The public surface listed in the README's "API
