@@ -27,8 +27,7 @@
         "phpstan/phpstan": "^2.0"
     },
     "suggest": {
-        "ext-gd": "Required for the GD-backed PNG renderer.",
-        "ext-imagick": "Alternative backend for the PNG renderer."
+        "ext-gd": "Required for the GD-backed PNG renderer."
     },
     "autoload": {
         "psr-4": {
