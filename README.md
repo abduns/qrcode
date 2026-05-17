@@ -3,7 +3,6 @@
 A from-scratch, framework-agnostic QR Code generator for PHP 8.2+ with zero required runtime dependencies.
 
 [![Tests](https://github.com/abduns/qrcode/actions/workflows/ci.yml/badge.svg)](https://github.com/abduns/qrcode/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/abduns/qrcode/main/coverage.json)](https://github.com/abduns/qrcode)
 [![Version](https://img.shields.io/packagist/v/abduns/qrcode.svg)](https://packagist.org/packages/abduns/qrcode)
 [![Downloads](https://img.shields.io/packagist/dt/abduns/qrcode.svg)](https://packagist.org/packages/abduns/qrcode)
 [![License](https://img.shields.io/packagist/l/abduns/qrcode.svg)](LICENSE.md)
